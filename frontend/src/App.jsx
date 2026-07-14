@@ -4,6 +4,8 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import AuthPage from "./pages/AuthPage";
 import LandingPage from "./pages/LandingPage"; 
 import PatientDashboard from "./pages/PatientDashboard";
+import HospitalDashboard from "./pages/HospitalDashboard";
+import AdminDashboard from "./pages/AdminDashboard";
 
 const LandingPage = () => <div className="p-8 text-xl font-bold">🚑 MediRoute AI Landing Page Platform Hub</div>;
 const PatientDashboard = () => <div className="p-8 text-emerald-600 font-bold">👤 Secure Patient Console Workspace</div>;
