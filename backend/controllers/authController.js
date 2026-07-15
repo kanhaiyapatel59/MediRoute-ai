@@ -8,6 +8,10 @@ import generateToken from "../utils/generateToken.js";
  * @access  Public
  */
 export const registerUser = async (req, res) => {
+  if (!req.body) {
+    return res.status(400).json({ message: "Request body is required" });
+  }
+
   const { name, email, password, role, phoneNumber, hospitalDetails } = req.body;
 
   try {

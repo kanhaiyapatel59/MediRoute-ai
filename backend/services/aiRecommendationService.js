@@ -21,14 +21,17 @@ class AIRecommendationService {
 
     // 2. Fetch all functional emergency hospital nodes currently accepting traffic
     const activeHospitals = await Hospital.find({ isActiveEmergencyHub: true });
-    if (!activeHospitals || activeHospitals.length === 0) {
-      throw new Error("No active emergency hospital hubs registered in the regional routing grid");
+
+    // Dev-safety fallback: if no active emergency hubs exist, use all hospitals so the pipeline can proceed.
+    const hospitalsForScoring =
+      activeHospitals && activeHospitals.length > 0 ? activeHospitals : await Hospital.find({});
+
+    if (!hospitalsForScoring || hospitalsForScoring.length === 0) {
+      throw new Error("No hospitals found to generate recommendations");
     }
 
     // 3. Batch process scoring metrics across available nodes
-    // NOTE: This array structure is explicitly kept clean so it can be passed natively to an
-    // HTTP/FastAPI client link once the predictive ML models are deployed.
-    const calculatedScores = activeHospitals.map(hospital => {
+    const calculatedScores = hospitalsForScoring.map((hospital) => {
       return hospitalScoringService.evaluateHospitalScore(hospital, incident);
     });
 
@@ -36,19 +39,19 @@ class AIRecommendationService {
     calculatedScores.sort((a, b) => b.aiScore - a.aiScore);
 
     // Take the top 5 optimized target nodes to populate recommendation array
-    const topMatches = calculatedScores.slice(0, 5).map(match => ({
+    const topMatches = calculatedScores.slice(0, 5).map((match) => ({
       hospital: match.hospitalId,
       aiScore: match.aiScore,
       confidenceScore: match.confidenceScore,
       reasoningSummary: match.reasoningSummary,
-      metricsEvaluated: match.metricsEvaluated
+      metricsEvaluated: match.metricsEvaluated,
     }));
 
     // 5. Database Commit: Archive recommendation parameters into analytics database
     const recommendationLog = await Recommendation.create({
       emergencyRequest: incident._id,
       patient: incident.patient,
-      recommendedHospitals: topMatches
+      recommendedHospitals: topMatches,
     });
 
     // 6. State Mutation: Auto-route the incident to the top-scoring hospital node
@@ -57,9 +60,12 @@ class AIRecommendationService {
     await incident.save();
 
     // Return the results with populated references for controller utility parsing
-    return await Recommendation.findById(recommendationLog._id)
-      .populate("recommendedHospitals.hospital", "name location contactNumbers capacity rating");
+    return await Recommendation.findById(recommendationLog._id).populate(
+      "recommendedHospitals.hospital",
+      "name location contactNumbers capacity rating"
+    );
   }
 }
 
 export default new AIRecommendationService();
+
